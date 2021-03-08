@@ -1,0 +1,50 @@
+framework:
+    messenger:
+        # Uncomment this (and the failed transport below) to send failed messages to this transport for later handling.
+        failure_transport: failed
+
+        transports:
+            # https://symfony.com/doc/current/messenger.html#transport-configuration
+             order:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                #serializer: messenger.transport.symfony_serializer
+                serializer: App\Serializer\orderSerializer
+                options:
+                    exchange:
+                        name: logistic
+                        type: direct
+                        default_publish_routing_key: order
+                    queues:
+                        order:
+                            binding_keys: [order]
+
+             delivery:
+                 dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                 serializer: messenger.transport.symfony_serializer
+                 options:
+                     exchange:
+                         name: logistic
+                         type: direct
+                         default_publish_routing_key: delivery
+                     queues:
+                         delivery:
+                             binding_keys: [ delivery ]
+             email:
+                 dsn: '%env(MESSENGER_TRANSPORT_DSN2)%'
+                 options:
+                     exchange:
+                         name: emails
+                     queue:
+                        email: ~
+
+
+             failed: 'doctrine://default?queue_name=failed'
+            # sync: 'sync://'
+
+        routing:
+            # Route your messages to the transports
+             'App\Message\newOrder': order
+             'App\Message\modifyOrder': order
+             'App\Message\newDelivery': delivery
+             'App\Message\receiveDelivery': delivery
+             'App\Message\email': email

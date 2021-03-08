@@ -1,0 +1,135 @@
+{% extends 'base.html.twig' %}
+
+
+{% block body %}
+
+
+        <div class="row mytable">
+            <div class="col-10">
+
+
+                <h4 id="schemat" class="text-center">Zobacz pełny schemat działania systemu <i class="fas fa-external-link-alt"></i></h4>
+                <div class="text-center mt-5"> <button type="button" id="neworder" class="btn btn-primary">Nowe zamówienie</button></div>
+                <h4 id="historia" class="text-center mt-5">Historia działania</h4>
+
+                <table class="table ">
+                    <thead>
+                    <tr>
+
+                        <th scope="col">Data</th>
+                        <th scope="col" style="width:700px;">Operacja</th>
+                        <th scope="col">Krok</th>
+                    </tr>
+                    </thead>
+                    <tbody id="data">
+                    {% for log in order %}
+                        <tr id="{{ log.id }}">
+                            <td> {{ log.createdAt|date('Y-m-d H:i:s') }}</td>
+                            <td> {{ log.info }}</td>
+                            <td> <img src="img/step{{ log.step }}.jpg"/></td>
+
+                        </tr>
+
+                    {% endfor %}
+
+                    </tbody>
+                </table>
+                <hr class="mt-5 mb-5">
+                <h4 id="schemat-details" class="text-center">Schemat działania systemu</h4>
+                <div id="">
+                    <p>
+                        <ul>
+                        <li>W sklepie tworzone jest nowe zamówienie.</li>
+                        <li>Zamówienie wysyłane jest do kolejki <span style="color:red;font-weight: bold">order</span></li>
+                        <li>Z kolejki <span style="color:red;font-weight: bold">order</span> zamówienie pobierane jest w magazynie, gdzie jest przetwarzane.</li>
+                        <li>Jeżeli produkt jest dostępny, ilość produktów na stanie jest pomniejszana, a do kolejki <span style="color:red;font-weight: bold">order</span> wysyłana jest informacja o zatwierdzeniu zamówienia. Jeżeli stan produktu spadnie przy tej operacji do 0, dodatkowo wysyłane jest żadanie nowej dostawy produktu do kolejki <span style="color:blue;font-weight: bold">delivery</span>.</li>
+                        <li>Jeżeli produkt jest niedostępny, do kolejki <span style="color:red;font-weight: bold">order</span> wysyłana jest informacja o anulowaniu zamówienia. Jednocześnie wysyłane jest żadanie nowej dostawy produktu do kolejki <span style="color:blue;font-weight: bold">delivery</span>.</li>
+                        <li>Z kolejki <span style="color:red;font-weight: bold">order</span> sklep pobiera aktualny status, przetwarza go, a następnie do kolejki <span style="color:green;font-weight: bold">email</span> wysyłą żądanie wysłania potwierdzenia</li>
+                        <li>Z kolejki <span style="color:green;font-weight: bold">email</span> mailer pobiera żądanie i wysyła mail z aktualnym statusem</li>
+                        <strong>W przypadku dostawy produktu</strong>
+                        <li>Z kolejki <span style="color:blue;font-weight: bold">delivery</span> dostawca pobiera żądanie dostawy</li>
+                        <li>Dostawca tworzy nową dostawę, a następnie wysyła ją do kolejki <span style="color:blue;font-weight: bold">delivery</span></li>
+                        <li>Magazyn pobiera dostawę z kolejki <span style="color:blue;font-weight: bold">delivery</span>, a następnie ją przetwarza (zwiększa stan produktu, aktywuje produkt)</li>
+                    </ul>
+                    </p>
+                    <p class="text-center"><img src="/img/schemat.jpg"/></p>
+                </div>
+            </div>
+
+        </div>
+
+
+<script>
+    $('#schemat').click(function() {
+        $([document.documentElement, document.body]).animate({
+            scrollTop: $("#schemat-details").offset().top
+        }, 500);
+    });
+    var latest = $('#data').find('tr:eq(0)').attr('id')
+    console.log(latest);
+    $('#neworder').click(function() {
+        var timer = new Timer();
+        $('#neworder').prop('disabled', true);
+        timer.start({countdown: true, startValues: {seconds: 30}});
+
+        $('#neworder').html('Zaczekaj '+timer.getTimeValues().toString());
+
+        timer.addEventListener('secondsUpdated', function (e) {
+            $('#neworder').html('Zaczekaj '+timer.getTimeValues().toString());
+        });
+
+        timer.addEventListener('targetAchieved', function (e) {
+            $('#neworder').html('Nowe zamówienie').prop('disabled', false);
+        });
+        $.get( "{{ path('neworder') }}");
+        worker();
+        setTimeout(stop,30000);
+        }
+    );
+    function stop() {
+        clearTimeout(timer);
+        console.log('stop')
+    }
+    function worker() {
+        $.ajax({
+            url: "/log",
+            type: "POST",
+            contentType: "application/json",
+            data: JSON.stringify( { "lastid": latest} ),
+            async: true,
+            success: function(data) {
+
+                // console.info(data.logs);return;
+                 $.each((data), function (i, item) {
+                     $('#schemat').click(function() {
+                         $([document.documentElement, document.body]).animate({
+                             scrollTop: $("#schemat-details").offset().top
+                         }, 500);
+                     });
+
+                        if((item.info).substring(0,9) === 'New order') {
+
+                            $([document.documentElement, document.body]).animate({
+                                scrollTop: $("#historia").offset().top
+                            }, 100);
+
+                            $('#data').html('');
+                        }
+                        console.log(item)
+                        var date = moment(item.createdAt.date).format('YYYY-MM-DD HH:mm:ss');
+                        latest = item.id;
+                        $('<tr id="' + item.id + '"><td>' + date + '</td><td>' + item.info + '</td><td><img src="img/step' + item.step + '.jpg"></td></tr>').prependTo($('#data')).hide().fadeIn(500);
+
+                });
+            },
+            complete: function() {
+                timer = setTimeout(worker, 1000);
+            }
+        });
+    };
+
+
+
+</script>
+
+{% endblock %}
